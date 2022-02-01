@@ -1,39 +1,49 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from auth import AuthHandler
-from schemas import AuthDetails
+import schemas
+from database import Base, engine, SessionLocal
+from models import Users
+from typing import List
+from sqlalchemy.orm import Session
 
-
+Base.metadata.create_all(engine)
 app = FastAPI()
 
+def get_session():
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
 auth_handler = AuthHandler()
-users = []
 
-@app.post('/register', status_code=201)
-def register(auth_details: AuthDetails):
-    if any(x['username'] == auth_details.username for x in users):
-        raise HTTPException(status_code=400, detail='Username is taken')
-    hashed_password = auth_handler.get_password_hash(auth_details.password)
-    users.append({
-        'username': auth_details.username,
-        'password': hashed_password
-    })
-    print(users)
-    return {'message':'user created'}
+@app.post('/register', status_code=status.HTTP_201_CREATED)
+def register(user: schemas.User, session: Session = Depends(get_session)):
+
+    db_user = session.query(Users).filter(Users.username == user.username).first()
+    if db_user:
+        return HTTPException(status_code=400, detail="Username is taken")
+    hashed_password = auth_handler.get_password_hash(user.password)
+    db_user = Users(username=user.username,password=hashed_password)
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+    return {'username':db_user.username,'message':'user created successfully'}
+
 
 
 @app.post('/login')
-def login(auth_details: AuthDetails):
-    user = None
-    for x in users:
-        if x['username'] == auth_details.username:
-            user = x
-            break
-
-    if (user is None) or (not auth_handler.verify_password(auth_details.password, user['password'])):
-        raise HTTPException(status_code=401, detail='Invalid username and/or password')
-    token = auth_handler.encode_token(user['username'])
-    return { 'token': token }
+def login(user: schemas.User, session: Session = Depends(get_session)):
+    username = user.username
+    password = user.password
+    db_user = session.query(Users).filter(Users.username == username).first()
+    if not db_user:
+        raise HTTPException(status_code=401, detail='Invalid username it does not exist')
+    if auth_handler.verify_password(password,db_user.password):
+        token = auth_handler.encode_token(username)
+        return {'message':'logged in successfully', 'token': token }
+    return {'message':'provided credentials is not true'}
 
 
 @app.get('/unprotected')
