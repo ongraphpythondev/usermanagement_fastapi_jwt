@@ -1,9 +1,9 @@
 # User Registration and authentication using PyJWT
 ## Setup libraries and Environment for using API 
 ### Used libraries versions :
-> python  3.9.7 <br>
-> fastapi 0.73.0 <br>
-> uvicorn 0.15.0<br>
+> Python  3.9.7 <br>
+> Fastapi 0.73.0 <br>
+> Uvicorn 0.15.0<br>
 > PyJWT 2.3.0<br>
 > SQLAlchemy 1.4.31<br>
 
